@@ -45,6 +45,7 @@
 
 # built-in
 import os
+import re
 
 # third-party
 from maya import cmds
@@ -104,7 +105,7 @@ def export_skin_weights(file_path=None, geometry=None):
     json_save(data, file_path)
     return file_path
 
-def import_skin_weights(file_path=None, geometry=None, remove_unused=None):
+def import_skin_weights(file_path=None, geometry=None, remove_unused=None, selected_verts=None):
     """
     PARAMS:
         file_path: str, path/to/import/location/mesh.json
@@ -126,6 +127,17 @@ def import_skin_weights(file_path=None, geometry=None, remove_unused=None):
             return
     else:
         data[0]["shape"] = geometry
+
+    # selected vert check
+    if selected_verts:
+        selected = cmds.ls(sl=True)
+        selected_verts_strings = cmds.filterExpand(sm=31)
+        if not selected_verts_strings:
+            vert_message = "No verts were selected, please select some verts, thanks."
+            return OpenMaya.MGlobal_displayWarning(vert_message)
+
+        selected_vert_indexes = _parse_for_indexes(selected_verts_strings)
+        data[0]["selected_vert_indexes"] = selected_vert_indexes
 
     # check verts
     if not cmds.objExists(geometry[0]):
@@ -186,13 +198,17 @@ def _import_skin_weights(data, geometry, file_path, remove_unused=None):
                 OpenMaya.MGlobal_displayWarning(message)
                 continue
 
-        skin_clusters = find_skin_clusters(geometry)
-        # remove skin clusters
-        if skin_clusters:
-            cmds.delete(skin_clusters)
-            skin_clusters = None
-            # skin_cluster = SkinData(skin_clusters[0])
-            # skin_cluster.set_data(skin_data)
+        # get clusters and set data
+        skin_cluster = find_skin_clusters(geometry)
+        if skin_cluster:
+            skin_cluster = skin_cluster[0]
+            skin_cluster_obj, missing_influences = _parallel_skin_clusters(skin_cluster, skin_data)
+            if not missing_influences:
+                skin_cluster_obj.set_data(skin_data)
+                continue
+            cmds.delete(skin_cluster)
+            message = "Removing skinCluster because of missing influences."
+            OpenMaya.MGlobal_displayWarning(message)
 
         # TODO: make joint remapper, Chris has a setup for this already
         skin_cluster = _create_new_skin_cluster(skin_data, geometry)
@@ -200,11 +216,27 @@ def _import_skin_weights(data, geometry, file_path, remove_unused=None):
             continue
         skin_cluster[0].set_data(skin_data)
         if remove_unused:
-            if skin_clusters:
-               remove_unused_influences(skin_clusters[0])
-            else:
-                remove_unused_influences(skin_cluster[1])
+            remove_unused_influences(skin_cluster[1])
         OpenMaya.MGlobal_displayInfo("Imported {0} onto {1}.".format(file_path, geometry))
+
+def _parallel_skin_clusters(skin_cluster, skin_data):
+    # get current influences
+    skin_cluster_obj = SkinData(skin_cluster)
+    current_data = skin_cluster_obj.gather_data()
+    current_influences = current_data["weights"].keys()
+
+    # unclock weights
+    for influence in current_influences:
+        cmds.setAttr('%s.liw' % influence, 0)
+    new_influences = skin_data["weights"].keys()
+
+    # TODO: add any misssing influences
+    missing_influences = []
+    for influence in new_influences:
+        if influence not in current_influences:
+            missing_influences.append(influence)
+            # cmds.skinCluster(skin_cluster, e=True, ai=influence)
+    return skin_cluster_obj, missing_influences
 
 
 def _unbake_vertex_blind_data(mesh, selection):
@@ -229,7 +261,7 @@ def _unbake_vertex_blind_data(mesh, selection):
         influences.extend(joints)
     influences = filter(None, list(set(influences)))
 
-    # get shape path
+    # create skinCluster
     shape = dag_path.fullPathName()
 
     # check for clusters, if so delete
@@ -252,7 +284,7 @@ def _unbake_vertex_blind_data(mesh, selection):
 
     # unlock influences used by skincluster
     for inf in influences:
-        cmds.setAttr('%s.liw' % inf)
+        cmds.setAttr('%s.liw' % inf, 0)
 
     # normalize needs turned off for pruning
     cmds.setAttr('%s.normalizeWeights' % skin_cluster[0], 0)
@@ -262,12 +294,11 @@ def _unbake_vertex_blind_data(mesh, selection):
 
     # get weights
     dag_path, mobject = skin_data.get_skin_dag_path_and_mobject()
-    weights = skin_data._get_weights(dag_path, mobject)
+    weights = skin_data.get_weights(dag_path, mobject)
     influence_id_pattern = []
     for x in xrange(empty_array.length()):
         # vert id's
         vert_id = empty_array[x]
-        w_attr = "{0}.weightList[{1}]".format(skin_cluster[0], vert_id)
 
         # get weight value
         full_list = fn_mesh.stringBlindDataComponentId(vert_id,
@@ -413,7 +444,7 @@ def _create_new_skin_cluster(skin_data, geometry):
 
     skin_cluster = cmds.skinCluster(existing_joints, geometry, tsb=True, nw=2,
                                     n=skin_data["skinCluster"])[0]
-    return (SkinData(skin_cluster), skin_cluster)
+    return SkinData(skin_cluster), skin_cluster
 
 def _geometry_check(geometry):
     if not geometry:
@@ -422,6 +453,15 @@ def _geometry_check(geometry):
         geo_message = "Please select a piece/s of geometry."
         return OpenMaya.MGlobal_displayError(geo_message)
     return geometry
+
+def _parse_for_indexes(vert_strings):
+    """Parses and returns the index value from vert attribute string values."""
+    vert_indexes = []
+    for vert_string in vert_strings:
+        vert_string = vert_string.split(".")[-1]
+        index = int(re.search(r'\d+', vert_string).group())
+        vert_indexes.append(index)
+    return vert_indexes
 
 #------------------------------------------------------------------------------#
 #------------------------------------------------------------------- CLASSES --#
@@ -440,7 +480,8 @@ class SkinData(object):
             "weights" : {},
             "blendWeights" : [],
             "skinCluster" : self.skin_cluster,
-            "shape" : self.shape
+            "shape" : self.shape,
+            "selected_vert_indexes" : [],
             }
 
     def gather_data(self):
@@ -467,7 +508,7 @@ class SkinData(object):
         return dag_path, mobject
 
     def get_influence_weights(self, dag_path, mobject):
-        weights = self._get_weights(dag_path, mobject)
+        weights = self.get_weights(dag_path, mobject)
 
         influence_paths = OpenMaya.MDagPathArray()
         influence_count = self.skin_set.influenceObjects(influence_paths)
@@ -479,7 +520,7 @@ class SkinData(object):
                            for influence in xrange(components_per_influence)]
             self.data["weights"][name] = weight_data
 
-    def _get_weights(self, dag_path, mobject):
+    def get_weights(self, dag_path, mobject):
         """Where the API magic happens."""
         weights = OpenMaya.MDoubleArray()
         util = OpenMaya.MScriptUtil()
@@ -527,7 +568,7 @@ class SkinData(object):
                          self.data[attribute])
 
     def set_influence_weights(self, dag_path, mobject):
-        weights = self._get_weights(dag_path, mobject)
+        weights = self.get_weights(dag_path, mobject)
         influence_paths = OpenMaya.MDagPathArray()
         influence_count = self.skin_set.influenceObjects(influence_paths)
         components_per_influence = weights.length() / influence_count
@@ -537,6 +578,13 @@ class SkinData(object):
         influences = [influence_paths[inf_count].partialPathName() for \
                       inf_count in xrange(influence_paths.length())]
 
+        # unlocks influences
+        for inf in influences:
+            cmds.setAttr('%s.liw' % inf, 0)
+
+        # selected verts
+        selected_vert_indexes = self.data["selected_vert_indexes"]
+
         # build influences/weights
         for imported_influence, imported_weights in self.data["weights"].items():
             for inf_count in xrange(influence_paths.length()):
@@ -544,6 +592,15 @@ class SkinData(object):
                 influence_name = remove_namespace(influence_name)
                 if influence_name == imported_influence:
                     for count in xrange(len(imported_weights)):
+
+                        # handle selected vert option
+                        if selected_vert_indexes:
+                            if count in selected_vert_indexes:
+                                weights.set(imported_weights[count],
+                                            count * influence_count + inf_count)
+                            continue
+
+                        # handle normal importing
                         weights.set(imported_weights[count],
                                     count * influence_count + inf_count)
                     if influence_name in influences:
