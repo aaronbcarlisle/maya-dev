@@ -238,7 +238,6 @@ def _parallel_skin_clusters(skin_cluster, skin_data):
             # cmds.skinCluster(skin_cluster, e=True, ai=influence)
     return skin_cluster_obj, missing_influences
 
-
 def _unbake_vertex_blind_data(mesh, selection):
     # get dag path
     dag_path = OpenMaya.MDagPath()
@@ -362,7 +361,6 @@ def _bake_vertex_blind_data(mesh):
     for count in xrange(len(vertex_indexes)):
         vertex_mint_array.append(count)
 
-
     # set joint and vertex id's
     db_values = []
     for i in xrange(vertexes.count()):
@@ -465,6 +463,7 @@ def _parse_for_indexes(vert_strings):
 
 #------------------------------------------------------------------------------#
 #------------------------------------------------------------------- CLASSES --#
+
 
 class SkinData(object):
     def __init__(self, skin_cluster):
