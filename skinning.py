@@ -8,8 +8,8 @@ from maya.api import OpenMaya, OpenMayaAnim
 from maya import cmds
 import KDTree
 
-from colossus.Utils.DCC.maya import skinning_utils
-from colossus.Utils.DCC.maya import maya_utils
+import skinning_utils
+import maya_utils
 
 
 def export_weights(geometry, path):
