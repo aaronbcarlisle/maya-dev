@@ -3,7 +3,7 @@ from maya.api import OpenMaya
 from maya import cmds
 from scipy import spatial
 
-from colossus.Utils.DCC.maya import maya_utils
+import maya_utils
 
 def get_ws_point_list(dag_path):
     shape_dag_path = maya_utils.get_dag_path_object(dag_path)
