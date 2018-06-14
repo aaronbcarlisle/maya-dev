@@ -9,8 +9,9 @@ from maya.api import OpenMaya
 from maya import cmds
 import KDTree
 
-from colossus.Utils.DCC.maya import skinning_utils
-from colossus.Utils.DCC.maya import maya_utils
+# internal
+import skinning_utils
+import maya_utils
 
 DEFAULT_BLIND_DATA_ID = datetime.now().year
 
