@@ -3,11 +3,12 @@ from maya import cmds
 
 def keep_selection(_function):
     """
-    Keeps selection after method call.
+    Maintains the selection from the beginning of the wrapped
+    function and ensures it persists regardless of exception.
 
-    :param function _function: Function to wrap.
+    :param callable _function: Function to wrap.
     :return: Returns the result of the wrapped function.
-    :rtype: function
+    :rtype: callable
     """
     def wrapper(*args, **kwargs):
         selection = cmds.ls(selection=True)
@@ -21,11 +22,11 @@ def keep_selection(_function):
 
 def undo(_function):
     """
-    Wraps the passed in function in an undo chunk.
+    Wraps the decorated function in function in an undo chunk.
 
-    :param function _function: Function to wrap.
+    :param callable _function: Function to wrap.
     :return: Returns the result of the wrapped function.
-    :rtype: function
+    :rtype: callable
     """
     def wrapper(*args, **kwargs):
         cmds.undoInfo(openChunk=True)
