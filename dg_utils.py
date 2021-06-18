@@ -19,7 +19,7 @@ def get_top_level_nodes_of_type(node_type, nodes=None, search_depth=None, **kwar
     # query the scene for nodes of given type with expanded search kwargs
     # defaults to using the ::* wildcard for nested reference filtering
     search_kwargs = dict(typ=node_type, long=True, dag=True, **kwargs)
-    nodes_to_search = cmds.ls(nodes or "::*", **search_kwargs)  
+    nodes_to_search = cmds.ls(nodes or "::*", **search_kwargs)
 
     # convert 0 to None for list slicing and convert 1 to 2 for dag root
     search_depth = search_depth or None
