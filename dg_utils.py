@@ -25,7 +25,7 @@ def get_root_nodes_of_type(node_type, nodes=None, search_depth=None, **kwargs):
     search_depth = search_depth or None
     search_depth = 2 if search_depth == 1 else search_depth
 
-    def _root_node(node_path):
+    def _get_root_node_of_type(node_path):
         """
         Find the node in the given node path that matches the given type.
 
@@ -41,5 +41,5 @@ def get_root_nodes_of_type(node_type, nodes=None, search_depth=None, **kwargs):
                 return "|".join(node_hierarchy[:node_index])
 
     # return a flattened list of the top level nodes
-    nodes_map = map(lambda node: _root_node(node), nodes_to_search)
+    nodes_map = map(_get_root_node_of_type, nodes_to_search)
     return list(filter(None, set(nodes_map)))
