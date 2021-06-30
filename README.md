@@ -1,2 +1,2 @@
 # Maya Dev
-Some useful maya utility methods.
+Some Maya utility methods.
