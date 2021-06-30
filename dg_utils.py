@@ -7,8 +7,8 @@ def get_root_nodes_of_type(node_type, nodes=None, search_depth=None, **kwargs):
 
     .. NOTE::
         Kwargs can be used to expand the ls command for more filtering.
-        e.g., The following returns all visible top level DAG objects.
-        >> get_top_level_nodes_of_type("joint", depth=1, visible=True)
+        e.g., The following returns all visible root joint nodes.
+        >> get_top_level_nodes_of_type("joint", visible=True)
 
     :param str node_type: The node type to search for.
     :param list(str) nodes: Optional list of nodes to search through.
