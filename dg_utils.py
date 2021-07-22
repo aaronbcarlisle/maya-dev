@@ -3,7 +3,7 @@ from maya import cmds
 
 def get_root_nodes_of_type(node_type, nodes=None, search_depth=None, **kwargs):
     """
-    Gets the all root nodes for a given node type.
+    Gets the root nodes for a given node type.
 
     .. NOTE::
         Kwargs can be used to expand the ls command for more filtering.
